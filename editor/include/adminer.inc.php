@@ -644,6 +644,10 @@ ORDER BY ORDINAL_POSITION", null, "") as $row
 		echo "</ul>\n";
 	}
 
+	function meParams() {
+		return null;
+	}
+
 	function _foreignColumn($foreignKeys, $column) {
 		foreach ((array) $foreignKeys[$column] as $foreignKey) {
 			if (count($foreignKey["source"]) == 1) {

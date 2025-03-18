@@ -1070,4 +1070,14 @@ class Adminer {
 		}
 		echo "</ul>\n";
 	}
+
+	/** Controls additional parameters of the base URL
+	*
+	* Used to hold arbitrary data for plugins/integrations.
+	*
+	* @return array
+	*/
+	function meParams() {
+		return null;
+	}
 }

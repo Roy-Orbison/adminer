@@ -99,12 +99,15 @@ define(
 	preg_replace('~\?.*~', '', relative_uri()) . '?'
 		. (sid() ? SID . '&' : '')
 		. ltrim(
-			http_build_query(array(
-				DRIVER => SERVER,
-				'ext' => isset($_GET['ext']) ? $_GET['ext'] : null,
-				'username' => isset($_GET['username']) ? $_GET['username'] : null,
-				'db' => DB != '' ? DB : null,
-				'ns' => isset($_GET['ns']) && DB != '' ? $_GET['ns'] : null,
+			http_build_query(array_replace(
+				Adminer::$instance->meParams() ?: array(),
+				array(
+					DRIVER => SERVER,
+					'ext' => isset($_GET['ext']) ? $_GET['ext'] : null,
+					'username' => isset($_GET['username']) ? $_GET['username'] : null,
+					'db' => DB != '' ? DB : null,
+					'ns' => isset($_GET['ns']) && DB != '' ? $_GET['ns'] : null,
+				)
 			)) . '&',
 			'&'
 		)
