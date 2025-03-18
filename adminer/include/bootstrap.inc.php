@@ -98,10 +98,16 @@ define(
 	'Adminer\ME',
 	preg_replace('~\?.*~', '', relative_uri()) . '?'
 		. (sid() ? SID . '&' : '')
-		. (SERVER !== null ? DRIVER . "=" . urlencode(SERVER) . '&' : '')
-		. ($_GET["ext"] ? "ext=" . urlencode($_GET["ext"]) . '&' : '')
-		. (isset($_GET["username"]) ? "username=" . urlencode($_GET["username"]) . '&' : '')
-		. (DB != "" ? 'db=' . urlencode(DB) . '&' . (isset($_GET["ns"]) ? "ns=" . urlencode($_GET["ns"]) . "&" : "") : '')
+		. ltrim(
+			http_build_query(array(
+				DRIVER => SERVER,
+				'ext' => isset($_GET['ext']) ? $_GET['ext'] : null,
+				'username' => isset($_GET['username']) ? $_GET['username'] : null,
+				'db' => DB != '' ? DB : null,
+				'ns' => isset($_GET['ns']) && DB != '' ? $_GET['ns'] : null,
+			)) . '&',
+			'&'
+		)
 );
 
 include "../adminer/include/design.inc.php";
