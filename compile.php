@@ -9,14 +9,6 @@ function add_apo_slashes($s) {
 	return addcslashes($s, "\\'");
 }
 
-function add_quo_slashes($s) {
-	$return = $s;
-	$return = addcslashes($return, "\n\r\$\"\\");
-	$return = preg_replace('~\0(?![0-7])~', '\\\\0', $return);
-	$return = addcslashes($return, "\0");
-	return $return;
-}
-
 function remove_lang($match) {
 	$idf = strtr($match[2], array("\\'" => "'", "\\\\" => "\\"));
 	$s = (Adminer\Lang::$translations[$idf] ?: $idf);
@@ -110,43 +102,6 @@ function put_file($match) {
 	return "?>\n$return" . (in_array($tokens[count($tokens) - 1][0], array(T_CLOSE_TAG, T_INLINE_HTML), true) ? "<?php" : "");
 }
 
-function lzw_compress($string) {
-	// compression
-	$dictionary = array_flip(range("\0", "\xFF"));
-	$word = "";
-	$codes = array();
-	for ($i=0; $i <= strlen($string); $i++) {
-		$x = @$string[$i];
-		if (strlen($x) && isset($dictionary[$word . $x])) {
-			$word .= $x;
-		} elseif ($i) {
-			$codes[] = $dictionary[$word];
-			$dictionary[$word . $x] = count($dictionary);
-			$word = $x;
-		}
-	}
-	// convert codes to binary string
-	$dictionary_count = 256;
-	$bits = 8; // ceil(log($dictionary_count, 2))
-	$return = "";
-	$rest = 0;
-	$rest_length = 0;
-	foreach ($codes as $code) {
-		$rest = ($rest << $bits) + $code;
-		$rest_length += $bits;
-		$dictionary_count++;
-		if ($dictionary_count >> $bits) {
-			$bits++;
-		}
-		while ($rest_length > 7) {
-			$rest_length -= 8;
-			$return .= chr($rest >> $rest_length);
-			$rest &= (1 << $rest_length) - 1;
-		}
-	}
-	return $return . ($rest_length ? chr($rest << (8 - $rest_length)) : "");
-}
-
 function put_file_lang($match) {
 	global $lang_ids, $project;
 	if ($_SESSION["lang"]) {
@@ -158,56 +113,20 @@ function put_file_lang($match) {
 		$translation_ids = array_flip($lang_ids); // default translation
 		foreach (Adminer\Lang::$translations as $key => $val) {
 			if ($val !== null) {
-				$translation_ids[$lang_ids[$key]] = implode("\t", (array) $val);
+				$translation_ids[$lang_ids[$key]] = $val;
 			}
 		}
 		$return .= '
-		case "' . $lang . '": $compressed = "' . add_quo_slashes(lzw_compress(implode("\n", $translation_ids))) . '"; break;';
+		case "' . $lang . '": return ' . var_representation(array_values($translation_ids)) . ';';
 	}
-	$translations_version = crc32($return);
-	return 'Lang::$translations = (array) $_SESSION["translations"];
-if ($_SESSION["translations_version"] != LANG . ' . $translations_version . ') {
-	Lang::$translations = array();
-	$_SESSION["translations_version"] = LANG . ' . $translations_version . ';
-}
-if (!Lang::$translations) {
-	Lang::$translations = get_translations(LANG);
-	$_SESSION["translations"] = Lang::$translations;
-}
+	return 'Lang::$translations = get_translations(LANG);
 
 function get_translations($lang) {
 	switch ($lang) {' . $return . '
 	}
-	$translations = array();
-	foreach (explode("\n", lzw_decompress($compressed)) as $val) {
-		$translations[] = (strpos($val, "\t") ? explode("\t", $val) : $val);
-	}
-	return $translations;
+	return array();
 }
 ';
-}
-
-function minify_css($file) {
-	global $project;
-	if ($project == "editor") {
-		$file = preg_replace('~\.icon-(up|down|plus|cross).*~', '', $file);
-	}
-	$file = preg_replace_callback('~url\((\w+\.(gif|png|jpg))\)~', function ($match) {
-		return "url(data:image/$match[2];base64," . base64_encode(file_get_contents(__DIR__ . "/adminer/static/$match[1]")) . ")"; // we don't have ME in *.css so we can only inline images
-	}, $file);
-	return lzw_compress(preg_replace('~\s*([:;{},])\s*~', '\1', preg_replace('~/\*.*?\*/\s*~s', '', $file)));
-}
-
-function minify_js($file) {
-	$file = preg_replace_callback("~'use strict';~", function ($match) {
-		static $count = 0;
-		$count++;
-		return ($count == 1 ? $match[0] : ''); // keep only the first one
-	}, $file);
-	if (function_exists('jsShrink')) {
-		$file = jsShrink($file);
-	}
-	return lzw_compress($file);
 }
 
 // $callback only to match signature
@@ -223,7 +142,14 @@ function compile_file($match, $callback = '') {
 	if ($callback) {
 		$file = call_user_func($callback, $file);
 	}
-	return '"' . add_quo_slashes($file) . '"';
+	# https://github.com/TysonAndre/var_representation/issues/6 escape invalid UTF-8 bytes
+	return preg_replace_callback(
+		'/[\x80-\xFF]/',
+		function($match) {
+			return '\x' . bin2hex($match[0]);
+		},
+		var_representation($file)
+	);
 }
 
 function number_type() {
@@ -351,9 +277,7 @@ $file = preg_replace('~\.\./adminer/static/(default\.css)~', '<?php echo h(' . $
 $file = preg_replace('~"\.\./adminer/static/(functions\.js)"~', $replace, $file);
 $file = preg_replace('~\.\./adminer/static/([^\'"]*)~', '" . h(' . $replace . ') . "', $file);
 $file = preg_replace('~"\.\./externals/jush/modules/(jush\.js)"~', $replace, $file);
-if (function_exists('phpShrink')) {
-	$file = phpShrink($file);
-}
+$file = preg_replace('~<\?php\s*\?>\n?|\n\?>\n?<\?php(?=\n)|\?>\n?<\?php~', '', $file);
 
 $filename = $project . (preg_match('~-dev$~', Adminer\VERSION) ? "" : "-" . Adminer\VERSION) . ($vendor ? "-$vendor" : "") . ($_SESSION["lang"] ? "-$_SESSION[lang]" : "") . ".php";
 file_put_contents($filename, $file);

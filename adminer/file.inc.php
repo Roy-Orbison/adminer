@@ -11,20 +11,18 @@ if (substr(VERSION, -4) != '-dev') {
 	header("Cache-Control: immutable");
 }
 
-@ini_set("zlib.output_compression", '1'); // @ - may be disabled
-
 if ($_GET["file"] == "default.css") {
 	header("Content-Type: text/css; charset=utf-8");
-	echo lzw_decompress(compile_file('../adminer/static/default.css;../externals/jush/jush.css', 'minify_css'));
+	echo compile_file('../adminer/static/default.css;../externals/jush/jush.css');
 } elseif ($_GET["file"] == "dark.css") {
 	header("Content-Type: text/css; charset=utf-8");
-	echo lzw_decompress(compile_file('../adminer/static/dark.css;../externals/jush/jush-dark.css', 'minify_css'));
+	echo compile_file('../adminer/static/dark.css;../externals/jush/jush-dark.css');
 } elseif ($_GET["file"] == "functions.js") {
 	header("Content-Type: text/javascript; charset=utf-8");
-	echo lzw_decompress(compile_file('../adminer/static/functions.js;static/editing.js', 'minify_js'));
+	echo compile_file('../adminer/static/functions.js;static/editing.js');
 } elseif ($_GET["file"] == "jush.js") {
 	header("Content-Type: text/javascript; charset=utf-8");
-	echo lzw_decompress(compile_file('../externals/jush/modules/jush.js;
+	echo compile_file('../externals/jush/modules/jush.js;
 ../externals/jush/modules/jush-autocomplete-sql.js;
 ../externals/jush/modules/jush-textarea.js;
 ../externals/jush/modules/jush-txt.js;
@@ -35,7 +33,7 @@ if ($_GET["file"] == "default.css") {
 ../externals/jush/modules/jush-mssql.js;
 ../externals/jush/modules/jush-oracle.js;
 ../externals/jush/modules/jush-simpledb.js;
-../externals/jush/modules/jush-igdb.js', 'minify_js'));
+../externals/jush/modules/jush-igdb.js');
 } elseif ($_GET["file"] == "logo.png") {
 	header("Content-Type: image/png");
 	echo compile_file('../adminer/static/logo.png');
